@@ -1,9 +1,7 @@
+import sys
 import json
 import curses
 import subprocess
-
-file = open('./items.json').read()
-items = json.loads(file)
 
 
 def format_item(item, secure=True):
@@ -84,17 +82,19 @@ def calculate_columns_width(items):
     return fixed_widths
 
 
-def select_from_menu(stdscr, fixed_widths):
+def select_from_menu(stdscr, fixed_widths, items):
     """Print, select in the menu"""
 
     current_item = 0
+
     while True:
-        stdscr.clear()
+
         display_items(stdscr, items, current_item, fixed_widths)
-        key = stdscr.getch()
 
         current_item_string = format_item(items[current_item], secure=False)
 
+        # Key events
+        key = stdscr.getch()
         if key == curses.KEY_UP:
             current_item = (current_item - 1) % len(items)
         elif key == curses.KEY_DOWN:
@@ -102,35 +102,52 @@ def select_from_menu(stdscr, fixed_widths):
         elif key == ord('\n'):
             return current_item_string
 
-
-def init_menu(stdscr):
-    """Initializes the configuration"""
-
-    # Initial Settings
-    curses.curs_set(0)
-    curses.start_color()
-    curses.use_default_colors()
-    curses.init_pair(1, 128, curses.COLOR_BLACK)
-    curses.init_pair(2, 84, curses.COLOR_BLACK)
-
-    fixed_widths = calculate_columns_width(items)
-    return select_from_menu(stdscr, fixed_widths)
-
-    stdscr.clear()
-    stdscr.refresh()
-    curses.napms(0)
+        stdscr.clear()
+        stdscr.refresh()
+        curses.napms(0)
 
 
 def string_to_clipboard(string):
+    """Uses xclip to copy a string"""
+
     command = ['xclip', '-sel', 'clip']
     subprocess.run(command, input=string, check=True)
     print('Copied to the clipboard!')
 
 
 def main():
-    selected = curses.wrapper(init_menu)
-    password = selected[-1].encode('utf-8')
-    string_to_clipboard(password)
+    """Wraps the initialization of curses and input validation"""
+
+    items = None
+
+    if len(sys.argv) > 1:
+        try:
+            data = sys.argv[1]
+            items = json.loads(data)
+        except json.JSONDecodeError as e:
+            print("Bad JSON format: ", e)
+
+    def init_menu(stdscr):
+        """Initializes the configuration"""
+
+        # Initial Settings
+        curses.curs_set(0)
+        curses.start_color()
+        curses.use_default_colors()
+        curses.init_pair(1, 128, curses.COLOR_BLACK)
+        curses.init_pair(2, 84, curses.COLOR_BLACK)
+
+        fixed_widths = calculate_columns_width(items)
+        return select_from_menu(stdscr, fixed_widths, items)
+
+        stdscr.clear()
+        stdscr.refresh()
+        curses.napms(0)
+
+    if items is not None:
+        selected = curses.wrapper(init_menu)
+        password = selected[-1].encode('utf-8')
+        string_to_clipboard(password)
 
 
 if __name__ == "__main__":
