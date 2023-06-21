@@ -1,8 +1,8 @@
 #!/bin/fish
 
 # Variables
-set -l PASSPHRASE_FILE ~/passphrase.me
-set -l ENCRYPTED_BWMASTER_FILE ~/bwmaster.gpg
+set -l PASSPHRASE_FILE ~/.gnupg/bw/passphrase.me
+set -l ENCRYPTED_BWMASTER_FILE ~/.gnupg/bw/bwmaster.gpg
 
 # Get master password
 set -l BWMASTER (cat $PASSPHRASE_FILE | gpg --quiet --pinentry-mode loopback --passphrase-fd 0 --decrypt $ENCRYPTED_BWMASTER_FILE)

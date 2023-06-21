@@ -3,23 +3,20 @@ import json
 import curses
 import subprocess
 
+from selector import ItemSelector
 
-def format_item(item, secure=True):
+
+def format_item(item):
     """Extract the attributes if an item as a tuple"""
 
     attributes = None
     item_name = item.get('name')
     if item.get('login') is not None:
-        if secure:
-            attributes = ('login', item_name)
-        else:
-            username = item.get('login').get('username')
-            password = item.get('login').get('password')
-            attributes = ('login', item_name, username, password)
-    else:
-        attributes = ('note?', item_name)
+        username = item.get('login').get('username')
+        password = item.get('login').get('password')
+        return ('login', item_name, username, password)
 
-    return attributes
+    return ('note?', item_name)
 
 
 def set_row_style(default, row_index, current_item):
@@ -46,11 +43,10 @@ def display_items(stdscr, items, current_item, fixed_widths):
 
     for row_index, item in enumerate(items):
 
-        attributes = format_item(item)
         x = 0
 
         fixed = ""
-        for col_index, attr in enumerate(attributes):
+        for col_index, attr in enumerate(item[0:2]):
             offset = fixed_widths[col_index]
             fixed = f"{attr:<{offset}}" + (" " * space_between)
 
@@ -58,53 +54,8 @@ def display_items(stdscr, items, current_item, fixed_widths):
             set_row_style(style, row_index, current_item)
             set_column_stye(style, row_index, col_index, current_item, attr)
 
-            stdscr.addstr(row_index, x, fixed, style[0])
+            stdscr.addstr(row_index + 1, x, fixed, style[0])
             x += offset + space_between
-
-
-def calculate_columns_width(items):
-    """Given a matrix of strings (item atributes), obtains the wider columns of every row on the matrix.
-    Group them together, so that it can be used to create a table with enough space for every item.
-    """
-
-    largest_row = max([len(format_item(item)) for item in items])
-    fixed_widths = [0] * largest_row
-
-    # Every width of every item
-    widths = [[len(attr) for attr in format_item(item)] for item in items]
-
-    for row in widths:
-
-        for i, col in enumerate(row):
-            if col > fixed_widths[i]:
-                fixed_widths[i] = col
-
-    return fixed_widths
-
-
-def select_from_menu(stdscr, fixed_widths, items):
-    """Print, select in the menu"""
-
-    current_item = 0
-
-    while True:
-
-        display_items(stdscr, items, current_item, fixed_widths)
-
-        current_item_string = format_item(items[current_item], secure=False)
-
-        # Key events
-        key = stdscr.getch()
-        if key == curses.KEY_UP:
-            current_item = (current_item - 1) % len(items)
-        elif key == curses.KEY_DOWN:
-            current_item = (current_item + 1) % len(items)
-        elif key == ord('\n'):
-            return current_item_string
-
-        stdscr.clear()
-        stdscr.refresh()
-        curses.napms(0)
 
 
 def string_to_clipboard(string):
@@ -113,6 +64,26 @@ def string_to_clipboard(string):
     command = ['xclip', '-sel', 'clip']
     subprocess.run(command, input=string, check=True)
     print('Copied to the clipboard!')
+
+
+def calculate_columns_width(items):
+    """Given a matrix of strings (item atributes), obtains the wider columns of every row on the matrix.
+    Group them together, so that it can be used to create a table with enough space for every item.
+    """
+
+    largest_row = max([len(item) for item in items])
+    fixed_widths = [0] * largest_row
+
+    # Every width of every item
+    widths = [[len(attr) for attr in item] for item in items]
+
+    for row in widths:
+
+        for i, col in enumerate(row):
+            if col > fixed_widths[i]:
+                fixed_widths[i] = col
+
+    return fixed_widths
 
 
 def main():
@@ -124,6 +95,7 @@ def main():
         try:
             data = sys.argv[1]
             items = json.loads(data)
+            items = [format_item(item) for item in items]
         except json.JSONDecodeError as e:
             print("Bad JSON format: ", e)
 
@@ -136,9 +108,12 @@ def main():
         curses.use_default_colors()
         curses.init_pair(1, 128, curses.COLOR_BLACK)
         curses.init_pair(2, 84, curses.COLOR_BLACK)
+        curses.init_pair(3, curses.COLOR_RED, curses.COLOR_BLACK)
 
         fixed_widths = calculate_columns_width(items)
-        return select_from_menu(stdscr, fixed_widths, items)
+
+        selector = ItemSelector(stdscr, fixed_widths, items)
+        return selector.selection_loop(display_items)
 
         stdscr.clear()
         stdscr.refresh()
@@ -152,3 +127,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    pass
